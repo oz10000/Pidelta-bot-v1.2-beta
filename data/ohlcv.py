@@ -1,21 +1,23 @@
-# data/ohlcv.py
-import ccxt
 import pandas as pd
-import time
+import numpy as np
+from typing import Optional
 
-_exchange = ccxt.okx({"enableRateLimit": True})
+def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
+    """Calcula el Average True Range (ATR) de un DataFrame OHLCV."""
+    if df is None or len(df) < period + 1:
+        return 100.0  # Default conservador
 
-def fetch_ohlcv(symbol: str, timeframe: str = "5m", limit: int = 200):
-    for attempt in range(3):
-        try:
-            ohlcv = _exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
-            df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
-            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-            for col in ["open", "high", "low", "close", "volume"]:
-                df[col] = df[col].astype(float)
-            return df
-        except Exception as e:
-            if attempt == 2:
-                raise
-            time.sleep(2)
-    return None
+    high = df["high"]
+    low = df["low"]
+    close = df["close"]
+
+    tr1 = high - low
+    tr2 = abs(high - close.shift())
+    tr3 = abs(low - close.shift())
+
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean().iloc[-1]
+
+    if np.isnan(atr) or atr <= 0:
+        return 100.0
+    return round(atr, 2)
