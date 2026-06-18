@@ -1,0 +1,37 @@
+name: PideltaBot Live
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # cada 5 minutos (mínimo permitido por GitHub Actions)[reference:5]
+  workflow_dispatch:         # permite ejecución manual
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    
+    # Evita ejecuciones simultáneas del mismo workflow
+    concurrency:
+      group: pidelta-bot
+      cancel-in-progress: false
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"        # 🔥 Caché automático de dependencias pip[reference:6][reference:7]
+          cache-dependency-path: requirements.txt
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          # Crear directorios necesarios para logs y estado
+          mkdir -p logs state
+      
+      - name: Run bot
+        run: python main.py
+        env:
+          OKX_API_KEY: ${{ secrets.OKX_API_KEY }}
+          OKX_SECRET: ${{ secrets.OKX_SECRET }}
+          OKX_PASSPHRASE: ${{ secrets.OKX_PASSPHRASE }}
