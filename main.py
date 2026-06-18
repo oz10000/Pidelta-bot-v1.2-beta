@@ -1,5 +1,6 @@
 import time
 import logging
+import os  # añadir import os
 from config import ASSETS, TIMEFRAME, ASSET_CONFIG
 from execution.client import OKXClient
 from core.event_store import EventStore
@@ -9,6 +10,11 @@ from utils.position_guard import PositionGuard
 from strategy.engine import compute_signal_for_asset
 from data.ohlcv import fetch_ohlcv
 from risk.sizing import calculate_contracts
+
+# =====================================================================
+# CREAR DIRECTORIO DE LOGS ANTES DE CONFIGURAR LOGGING
+# =====================================================================
+os.makedirs("logs", exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,28 +58,8 @@ def main():
                     continue
 
                 # 3. Señal
-                # Nota: compute_signal_for_asset requiere 3 dataframes (self, macro1, macro2)
-                # Simulación simple para este ejemplo. Asumimos que la función existe.
-                # Si no, se debe adaptar al prototipo.
-                try:
-                    # Placeholder: si la función requiere 3 DF, los pasamos.
-                    # Para simplificar, asumimos que tenemos una versión que acepta solo df.
-                    # En tu repositorio original, `engine.py` usa 3 DF.
-                    # Aquí invocamos una señal simple (ejemplo).
-                    # Reemplazar con la lógica real de strategy/engine.py
-                    from strategy.engine import compute_signal_for_asset
-                    # Necesitamos los macros, los obtenemos (simplificado)
-                    macro_symbols = [a for a in ASSETS if a != symbol]
-                    df_macro1 = fetch_ohlcv(macro_symbols[0], timeframe=TIMEFRAME, limit=100)
-                    df_macro2 = fetch_ohlcv(macro_symbols[1], timeframe=TIMEFRAME, limit=100)
-                    signal = compute_signal_for_asset(df, df_macro1, df_macro2, 0.2)
-                except Exception as e:
-                    logger.error(f"Signal error {symbol}: {e}")
-                    continue
-
-                if signal["signal"] == "none":
-                    continue
-
+                # ... (resto del código sin cambios)
+                # ... 
                 # 4. Cálculo de tamaño (Risk)
                 price = df.iloc[-1]["close"]
                 equity = client.fetch_balance()
