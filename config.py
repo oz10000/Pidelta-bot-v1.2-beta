@@ -3,7 +3,7 @@ import os
 # ============================================================================
 # MODO DE OPERACIÓN
 # ============================================================================
-MODE = "paper"  # paper | demo | live
+MODE = "demo"  # paper | demo | live
 
 # ============================================================================
 # ACTIVOS Y TIMEFRAME
@@ -46,3 +46,8 @@ ASSET_CONFIG = {
 OKX_API_KEY = os.getenv("OKX_API_KEY")
 OKX_SECRET = os.getenv("OKX_SECRET")
 OKX_PASSPHRASE = os.getenv("OKX_PASSPHRASE")
+
+# Alias para compatibilidad (si algún módulo usa API_KEY directamente)
+API_KEY = OKX_API_KEY
+SECRET_KEY = OKX_SECRET
+PASSPHRASE = OKX_PASSPHRASE
