@@ -4,57 +4,48 @@ import time
 import logging
 from typing import Optional, Dict, List
 
-import config  # Importa el módulo config global
+import config
 
 logger = logging.getLogger("OKXClient")
 
 class OKXClient:
     def __init__(self):
+        # ===================================================================
+        # CONFIGURACIÓN CORRECTA PARA FUTUROS PERPETUOS (SWAP)
+        # ===================================================================
         self.ex = ccxt.okx({
-            "apiKey": config.OKX_API_KEY,      # Usa OKX_API_KEY
+            "apiKey": config.OKX_API_KEY,
             "secret": config.OKX_SECRET,
             "password": config.OKX_PASSPHRASE,
             "enableRateLimit": True,
-            "options": {"defaultType": "future"}  # Asegura futuros swap
+            "options": {
+                "defaultType": "swap",      # 🔥 Clave: swap para perpetuos
+            }
         })
         self.strategy_version = config.STRATEGY_VERSION
         self.session_id = config.SESSION_ID
         self.prefix = config.BOT_CL_ORD_PREFIX
-        self._pos_mode = None
+        # Modo de posición: por defecto net_mode (se puede sobrescribir)
+        self._pos_mode = getattr(config, "POS_MODE", "net_mode")
 
     # ========================================================================
     # 1. IDEMPOTENCIA Y DETERMINISMO
     # ========================================================================
     def _generate_cl_ord_id(self, symbol: str, side: str, kind: str) -> str:
-        """
-        Genera clOrdId DETERMINISTA.
-        Basado en símbolo, lado, tipo y versión de estrategia.
-        """
         raw = f"{symbol}:{side}:{kind}:{self.strategy_version}:{self.session_id}"
         digest = hashlib.sha256(raw.encode()).hexdigest()[:24]
         return f"{self.prefix}_{digest}"
 
     def _is_my_order(self, order: Dict) -> bool:
-        """Verifica si la orden pertenece a este bot por el clOrdId."""
         cl = order.get("clientOrderId", "")
         return cl.startswith(f"{self.prefix}_")
 
     # ========================================================================
-    # 2. HELPERS DE POSICIÓN Y MODO
+    # 2. HELPERS DE POSICIÓN
     # ========================================================================
-    def _get_pos_mode(self) -> str:
-        if self._pos_mode:
-            return self._pos_mode
-        try:
-            res = self.ex.private_get_account_config()
-            self._pos_mode = res["data"][0]["posMode"]
-        except Exception:
-            self._pos_mode = "net_mode"
-        return self._pos_mode
-
     def _pos_side(self, side: str) -> Optional[str]:
-        mode = self._get_pos_mode()
-        if mode == "net_mode":
+        """Determina posSide según el modo de posición."""
+        if self._pos_mode == "net_mode":
             return None
         return "long" if side == "buy" else "short"
 
@@ -131,7 +122,6 @@ class OKXClient:
                 logger.error("Market order sent but no order ID returned")
                 return order
 
-            # Polling de fill
             start_time = time.time()
             while time.time() - start_time < config.FILL_TIMEOUT_SECONDS:
                 try:
@@ -159,7 +149,7 @@ class OKXClient:
             return None
 
     # ========================================================================
-    # 5. PROTECCIONES (SL/TP/TRAILING) CON PARÁMETROS OKX V5 CORRECTOS
+    # 5. PROTECCIONES (SL/TP/TRAILING)
     # ========================================================================
     def _place_conditional(
         self,
@@ -172,13 +162,11 @@ class OKXClient:
     ) -> Optional[Dict]:
         size = self._round_contracts(symbol, size)
 
-        # Verificar posición
         position = self.fetch_position(symbol)
         if position is None:
             logger.warning(f"Cannot place {kind}: No position exists for {symbol}")
             return None
 
-        # Idempotencia
         cl = self._generate_cl_ord_id(symbol, side, kind)
         existing = self.find_order_by_clord(symbol, cl)
         if existing:
@@ -191,8 +179,8 @@ class OKXClient:
             "reduceOnly": True,
             "clOrdId": cl,
             "ordType": "conditional",
-            "triggerPxType": "last",    # OKX requiere esto
-            "ordPx": "-1",              # Ejecución a mercado
+            "triggerPxType": "last",
+            "ordPx": "-1",
             "sz": str(size),
             "side": side,
         }
